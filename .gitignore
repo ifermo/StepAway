@@ -1,0 +1,14 @@
+# SwiftPM
+.build/
+.swiftpm/
+Package.resolved
+
+# App bundle produced by Scripts/make-app.sh
+build/
+
+# macOS
+.DS_Store
+
+# Editors
+*.xcuserstate
+xcuserdata/

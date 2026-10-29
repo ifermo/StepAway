@@ -1,0 +1,123 @@
+import AppKit
+import SwiftUI
+
+@MainActor
+final class OverlayModel: ObservableObject {
+    @Published var kind: BreakKind = .short
+    @Published var remaining: TimeInterval = 0
+    @Published var total: TimeInterval = 1
+    @Published var style: OverlayStyle = .aurora
+
+    var clock: String {
+        let value = max(0, Int(remaining.rounded(.up)))
+        return String(format: "%d:%02d", value / 60, value % 60)
+    }
+
+    var progress: Double {
+        guard total > 0 else { return 0 }
+        return min(max(1 - remaining / total, 0), 1)
+    }
+}
+
+struct BreakOverlayView: View {
+    @ObservedObject var model: OverlayModel
+
+    var body: some View {
+        ZStack {
+            if OverlayMetal.shared.isAvailable {
+                MetalOverlayBackground(style: model.style, progress: model.progress)
+                    .ignoresSafeArea()
+            } else {
+                GradientFallback()
+            }
+
+            VStack(spacing: 18) {
+                Text(model.kind.title)
+                    .font(.system(size: 18, weight: .medium, design: .rounded))
+                    .opacity(0.75)
+                Text("看向 6 米外，放松眼部")
+                    .font(.system(size: 15, weight: .regular, design: .rounded))
+                    .opacity(0.6)
+                Text(model.clock)
+                    .font(.system(size: 92, weight: .semibold, design: .rounded).monospacedDigit())
+            }
+            .foregroundStyle(.white)
+        }
+    }
+}
+
+private struct GradientFallback: View {
+    var body: some View {
+        TimelineView(.animation) { context in
+            let phase = context.date.timeIntervalSinceReferenceDate
+            AngularGradient(
+                colors: [
+                    Color(red: 0.10, green: 0.13, blue: 0.22),
+                    Color(red: 0.16, green: 0.28, blue: 0.42),
+                    Color(red: 0.09, green: 0.12, blue: 0.20)
+                ],
+                center: .center,
+                angle: .degrees(phase * 4)
+            )
+            .blur(radius: 40)
+            .ignoresSafeArea()
+        }
+    }
+}
+
+@MainActor
+final class OverlayWindow: NSWindow {
+    init(screen: NSScreen, hidesFromScreenCapture: Bool) {
+        super.init(contentRect: screen.frame, styleMask: .borderless, backing: .buffered, defer: false)
+
+        isOpaque = false
+        backgroundColor = .clear
+        hasShadow = false
+        // Above fullscreen apps and every Space; needs .fullScreenAuxiliary to join
+        // another app's fullscreen Space instead of pulling the user out of it.
+        level = .screenSaver
+        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
+        if hidesFromScreenCapture {
+            sharingType = .none
+        }
+    }
+
+    override var canBecomeKey: Bool { false }
+    override var canBecomeMain: Bool { false }
+}
+
+@MainActor
+final class BreakOverlayController {
+    private let store: SettingsStore
+    private let model = OverlayModel()
+    private var windows: [OverlayWindow] = []
+
+    init(store: SettingsStore) {
+        self.store = store
+    }
+
+    func show(kind: BreakKind, remaining: TimeInterval, total: TimeInterval, style: OverlayStyle) {
+        model.kind = kind
+        model.remaining = remaining
+        model.total = max(total, 1)
+        model.style = style
+        if windows.isEmpty {
+            // Opt-out only for local verification captures.
+            let hide = store.value.hideOverlayFromScreenCapture
+                && ProcessInfo.processInfo.environment["STEPAWAY_SHOW_IN_CAPTURE"] == nil
+            for screen in NSScreen.screens {
+                let window = OverlayWindow(screen: screen, hidesFromScreenCapture: hide)
+                window.contentView = NSHostingView(rootView: BreakOverlayView(model: model))
+                window.setFrame(screen.frame, display: true)
+                window.orderFrontRegardless()
+                windows.append(window)
+            }
+        }
+    }
+
+    func hide() {
+        guard !windows.isEmpty else { return }
+        windows.forEach { $0.orderOut(nil) }
+        windows.removeAll()
+    }
+}
