@@ -41,9 +41,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private let stats = StatsStore()
     private let quota = QuotaStore()
+    private let screenLocker: ScreenLocker = SACScreenLocker()
 
     private var phaseStartedAt: Date?
     private var currentPhase: TimerEngine.Phase = .work
+    private var lockGate = BreakLockGate()
     private var sleepStartedAt: Date?
     private var isDemo = false
 
@@ -84,6 +86,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self.closeInterval(previous, at: at)
             self.currentPhase = next
             self.phaseStartedAt = at
+            self.lockGate.reset()
             self.hud.hide()
             if case .breaking(_) = next { self.sound.playStart() }
             if case .breaking(_) = previous { self.sound.playEnd() }
@@ -93,13 +96,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self else { return }
             self.menuBar.render(snapshot)
             if snapshot.isBreaking {
+                let kind = self.breakKind(from: snapshot)
                 self.overlay.show(
-                    kind: self.breakKind(from: snapshot),
+                    kind: kind,
                     remaining: snapshot.remaining,
                     total: snapshot.total,
                     style: self.resolvedStyle(for: snapshot),
                     remainingSkips: snapshot.remainingSkips
                 )
+                self.lockScreenIfDue(kind: kind, snapshot: snapshot)
             } else {
                 self.overlay.hide()
             }
@@ -191,6 +196,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func breakKind(from snapshot: TimerEngine.Snapshot) -> BreakKind {
         if case .breaking(let kind) = snapshot.phase { return kind }
         return .short
+    }
+
+    /// Long breaks lock the screen once the skip grace window has passed, so the
+    /// enforced part of the break starts after the user's chance to opt out.
+    private func lockScreenIfDue(kind: BreakKind, snapshot: TimerEngine.Snapshot) {
+        let elapsed = snapshot.total - snapshot.remaining
+        guard lockGate.shouldLockScreen(
+            kind: kind,
+            enabled: store.value.lockScreenDuringLongBreak,
+            elapsed: elapsed
+        ) else { return }
+        screenLocker.lockScreen()
     }
 
     private func makeDetectors() -> [Detector] {

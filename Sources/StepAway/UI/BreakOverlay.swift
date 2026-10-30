@@ -16,6 +16,28 @@ enum OverlaySkipGate {
     }
 }
 
+/// Fires once per long break. The screen only locks after the skip button has
+/// been on screen long enough to be used, so it never locks at the exact moment
+/// the button appears.
+struct BreakLockGate {
+    /// How long the skip button stays pressable before the screen locks.
+    static let skipGrace: TimeInterval = 10
+
+    static var lockDelay: TimeInterval { OverlaySkipGate.unlockDelay + skipGrace }
+
+    private var fired = false
+
+    mutating func reset() {
+        fired = false
+    }
+
+    mutating func shouldLockScreen(kind: BreakKind, enabled: Bool, elapsed: TimeInterval) -> Bool {
+        guard enabled, kind == .long, !fired, elapsed >= Self.lockDelay else { return false }
+        fired = true
+        return true
+    }
+}
+
 @MainActor
 final class OverlayModel: ObservableObject {
     @Published var kind: BreakKind = .short

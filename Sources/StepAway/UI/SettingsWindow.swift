@@ -77,6 +77,10 @@ struct SettingsView: View {
                     value: durationBinding(\.longBreakDuration), in: 60...3600, step: 60)
             Stepper("每 \(store.value.longBreakEvery) 次短休息后长休息",
                     value: intBinding(\.longBreakEvery), in: 1...10)
+            Toggle("长休息时锁定屏幕", isOn: boolBinding(\.lockScreenDuringLongBreak))
+            Text("休息满 10 秒解锁跳过按钮，按钮再显示 10 秒后仍没跳过就锁屏，回到电脑前需要解锁（密码或 Touch ID）。锁屏走 macOS 私有接口 SACLockScreenImmediate，即 ⌃⌘Q 背后的调用。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
             Text("改动在当前计时结束后生效。")
                 .font(.caption)
                 .foregroundStyle(.secondary)

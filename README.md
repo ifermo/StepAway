@@ -24,6 +24,17 @@ screen recordings by default via `NSWindow.sharingType = .none`.
 **Pre-break HUD** — a 60 s heads-up before the overlay appears, so you can get to
 a stopping point.
 
+**Skipping** — 10 s into any break a skip button fades in at the bottom of the
+overlay. It spends one of the daily skip quota and is hidden once the quota is
+gone, so a break is never skipped before it has been served.
+
+**Lock screen on long breaks** — 20 s into a long break the session locks through
+the private `SACLockScreenImmediate` in `login.framework` (the call behind ⌃⌘Q),
+so getting back to work requires an unlock. Skipping during the 10 s the button is
+on screen cancels it, and short breaks never lock. On by default, toggleable in
+settings. If a future macOS drops the symbol, it falls back to
+`pmset displaysleepnow`.
+
 **Auto-pause** — detectors are polled every 5 s and a verdict must persist for
 two consecutive polls before the timer pauses (and two clean polls before it
 resumes), so one stray window cannot flap the timer.

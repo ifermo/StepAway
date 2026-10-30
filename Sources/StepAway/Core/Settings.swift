@@ -19,6 +19,7 @@ struct Settings: Codable, Equatable {
 
     // P0 additions
     var pauseOnSleep: Bool = true
+    var lockScreenDuringLongBreak: Bool = true
     var dailySkipLimit: Int = 3
     var dailySnoozeLimitSeconds: TimeInterval = 30 * 60
     var preBreakHUDEnabled: Bool = true
@@ -93,7 +94,7 @@ extension Settings {
         case workDuration, shortBreakDuration, longBreakDuration, longBreakEvery
         case idlePauseSeconds, postponeBy, detectorPollInterval, hideOverlayFromScreenCapture
         case calendarDetectorEnabled, screenSharingDetectorEnabled, meetingAppBundleIDs
-        case pauseOnSleep, dailySkipLimit, dailySnoozeLimitSeconds
+        case pauseOnSleep, lockScreenDuringLongBreak, dailySkipLimit, dailySnoozeLimitSeconds
         case preBreakHUDEnabled, preBreakLeadSeconds
         case soundEnabled, soundVolume, soundStartName, soundEndName
         case ignoredBundleIDs, excludeFrontmostApp, overlayStyle
@@ -123,6 +124,7 @@ extension Settings {
             screenSharingDetectorEnabled: value(.screenSharingDetectorEnabled, defaults.screenSharingDetectorEnabled),
             meetingAppBundleIDs: value(.meetingAppBundleIDs, defaults.meetingAppBundleIDs),
             pauseOnSleep: value(.pauseOnSleep, defaults.pauseOnSleep),
+            lockScreenDuringLongBreak: value(.lockScreenDuringLongBreak, defaults.lockScreenDuringLongBreak),
             dailySkipLimit: value(.dailySkipLimit, defaults.dailySkipLimit),
             dailySnoozeLimitSeconds: value(.dailySnoozeLimitSeconds, defaults.dailySnoozeLimitSeconds),
             preBreakHUDEnabled: value(.preBreakHUDEnabled, defaults.preBreakHUDEnabled),

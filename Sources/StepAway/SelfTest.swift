@@ -297,6 +297,68 @@ enum SelfTest {
             check("overlay shows skip at 10s", model.showsSkip)
         }
 
+        // 20. Long breaks lock the screen once, after the skip button has had time to be used.
+        do {
+            var gate = BreakLockGate()
+            let delay = BreakLockGate.lockDelay
+            check("lock gate: skip window opens before the lock", OverlaySkipGate.unlockDelay < delay)
+            check("lock gate: quiet before the grace ends", gate.shouldLockScreen(kind: .long, enabled: true, elapsed: delay - 0.1) == false)
+            check("lock gate: fires once the grace ends", gate.shouldLockScreen(kind: .long, enabled: true, elapsed: delay))
+            check("lock gate: fires once per break", gate.shouldLockScreen(kind: .long, enabled: true, elapsed: 300) == false)
+
+            gate.reset()
+            check("lock gate: short breaks never lock", gate.shouldLockScreen(kind: .short, enabled: true, elapsed: 300) == false)
+            check("lock gate: disabled stays quiet", gate.shouldLockScreen(kind: .long, enabled: false, elapsed: 300) == false)
+            check("lock gate: fires after reset", gate.shouldLockScreen(kind: .long, enabled: true, elapsed: delay + 1))
+        }
+
+        // 21. Settings survive a JSON round trip, so a new key cannot silently
+        //     fall back to its default for existing users.
+        do {
+            var settings = Settings()
+            settings.lockScreenDuringLongBreak = false
+            settings.dailySkipLimit = 7
+            guard let data = try? JSONEncoder().encode(settings),
+                  let decoded = try? JSONDecoder().decode(Settings.self, from: data)
+            else { return fail("settings round trip") }
+            check("settings keep lock-screen flag", decoded.lockScreenDuringLongBreak == false)
+            check("settings keep skip limit", decoded.dailySkipLimit == 7, "limit=\(decoded.dailySkipLimit)")
+            check("settings round trip is lossless", decoded == settings)
+        }
+
+        // 22. Driven through the real engine, only the long break trips the lock,
+        //     and it does so exactly once while the break is still running.
+        do {
+            var settings = Settings()
+            settings.workDuration = 3
+            settings.shortBreakDuration = 20
+            settings.longBreakDuration = 60
+            settings.longBreakEvery = 2
+            settings.preBreakHUDEnabled = false
+            let engine = TimerEngine(settings: settings, quota: tempQuota(), clock: { base })
+
+            var gate = BreakLockGate()
+            var locks = 0
+            var sawShortBreak = false
+            engine.onChange = { snapshot in
+                guard snapshot.isBreaking else { return }
+                let kind: BreakKind = snapshot.total == 60 ? .long : .short
+                if kind == .short { sawShortBreak = true }
+                let elapsed = snapshot.total - snapshot.remaining
+                if gate.shouldLockScreen(kind: kind, enabled: true, elapsed: elapsed) {
+                    locks += 1
+                }
+            }
+
+            for _ in 0..<23 { engine.advance(by: 1) }   // work 3 + short break 20
+            check("lock wiring: short break observed", sawShortBreak)
+            check("lock wiring: short break never locks", locks == 0, "locks=\(locks)")
+
+            for _ in 0..<28 { engine.advance(by: 1) }   // work 3 + long break 25
+            check("lock wiring: long break locks once", locks == 1, "locks=\(locks)")
+            check("lock wiring: break still running", engine.isBreaking)
+        }
+
         print(failures == 0 ? "ALL CHECKS PASSED" : "\(failures) CHECK(S) FAILED")
         return Int32(failures)
     }
