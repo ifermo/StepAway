@@ -280,6 +280,23 @@ enum SelfTest {
             check("stats summary text", summary.text.contains("5m"), summary.text)
         }
 
+        // 19. The overlay skip button unlocks only after the minimum break time
+        //     and only while the day's skip quota remains.
+        do {
+            check("skip gate: locked before 10s", OverlaySkipGate.shouldShow(elapsed: 9.5, remainingSkips: 3) == false)
+            check("skip gate: unlocked at 10s", OverlaySkipGate.shouldShow(elapsed: 10, remainingSkips: 3))
+            check("skip gate: hidden once quota exhausted", OverlaySkipGate.shouldShow(elapsed: 30, remainingSkips: 0) == false)
+
+            let model = OverlayModel()
+            model.total = 20
+            model.remaining = 12
+            model.remainingSkips = 2
+            check("overlay elapsed derived from countdown", model.elapsed == 8, "elapsed=\(model.elapsed)")
+            check("overlay hides skip at 8s", model.showsSkip == false)
+            model.remaining = 10
+            check("overlay shows skip at 10s", model.showsSkip)
+        }
+
         print(failures == 0 ? "ALL CHECKS PASSED" : "\(failures) CHECK(S) FAILED")
         return Int32(failures)
     }

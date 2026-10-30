@@ -61,7 +61,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         engine = TimerEngine(store: store, quota: quota)
-        overlay = BreakOverlayController(store: store)
+        overlay = BreakOverlayController(store: store, onSkip: { [weak self] in
+            guard let self else { return }
+            self.engine.skipBreak()
+        })
         sound = SoundPlayer(store: store)
         hud = PreBreakHUD(onPostpone: { [weak self] in
             guard let self else { return }
@@ -94,7 +97,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     kind: self.breakKind(from: snapshot),
                     remaining: snapshot.remaining,
                     total: snapshot.total,
-                    style: self.resolvedStyle(for: snapshot)
+                    style: self.resolvedStyle(for: snapshot),
+                    remainingSkips: snapshot.remainingSkips
                 )
             } else {
                 self.overlay.hide()
